@@ -199,7 +199,7 @@ export default function App() {
           </div>
           {!apiKey&&(
             <div style={{ marginTop:"8px", fontSize:"11px", color:"#f59e0b", paddingLeft:"118px" }}>
-              💡 <a href="https://console.cloud.google.com/" target="_blank" rel="noreferrer" style={{ color:"#60a5fa" }}>Google Cloud Console</a> → YouTube Data API v3 활성화 → 사용자 인증 정보 → API 키 생성
+              💡 <a href="https://console.cloud.google.com/" target="_blank" rel="noreferrer" style={{ color:"#60a5fa" }}>Google Cloud Console</a> → YouTube Data API v3 활성화 → 사용자 인증 정보 → API 키 생성 (무료 10,000 유닛/일 ≈ 약 12회 전체 스캔)
             </div>
           )}
         </div>
@@ -307,11 +307,13 @@ export default function App() {
                 <span>📅 {selectedVideo.date}</span><span>⏱ {selectedVideo.duration}</span><span>👁 {selectedVideo.views} 조회</span>
               </div>
             </div>
-                        <div style={{ position:"relative", width:"100%", paddingBottom:"56.25%", height:0, borderRadius:"8px", overflow:"hidden" }}>
+            <div style={{ position:"relative", width:"100%", paddingBottom:"56.25%", height:0, borderRadius:"8px", overflow:"hidden" }}>
               <iframe key={selectedVideo.youtubeId} src={`https://www.youtube.com/embed/${selectedVideo.youtubeId}?autoplay=1&rel=0&modestbranding=1`} title={selectedVideo.title} allowFullScreen allow="autoplay; encrypted-media; fullscreen" style={{ position:"absolute", inset:0, width:"100%", height:"100%", border:"none", borderRadius:"8px" }} />
             </div>
             <div style={{ marginTop:"10px", fontSize:"11px", color:"#475569", textAlign:"center" }}>ESC 또는 바깥 클릭으로 닫기</div>
-
+          </div>
+        </div>
+      )}
     </div>
   );
 }
