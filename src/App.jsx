@@ -307,13 +307,11 @@ export default function App() {
                 <span>📅 {selectedVideo.date}</span><span>⏱ {selectedVideo.duration}</span><span>👁 {selectedVideo.views} 조회</span>
               </div>
             </div>
-            <div style={{ position:"relative", width:"100%", paddingBottom:"56.25%", height:0, borderRadius:"8px", overflow:"hidden" }}>
+                        <div style={{ position:"relative", width:"100%", paddingBottom:"56.25%", height:0, borderRadius:"8px", overflow:"hidden" }}>
               <iframe key={selectedVideo.youtubeId} src={`https://www.youtube.com/embed/${selectedVideo.youtubeId}?autoplay=1&rel=0&modestbranding=1`} title={selectedVideo.title} allowFullScreen allow="autoplay; encrypted-media; fullscreen" style={{ position:"absolute", inset:0, width:"100%", height:"100%", border:"none", borderRadius:"8px" }} />
             </div>
             <div style={{ marginTop:"10px", fontSize:"11px", color:"#475569", textAlign:"center" }}>ESC 또는 바깥 클릭으로 닫기</div>
-          </div>
-        </div>
-      )}
+
     </div>
   );
 }
