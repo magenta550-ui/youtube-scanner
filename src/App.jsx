@@ -1,5 +1,4 @@
 import { useState, useEffect, useRef } from "react";
-
 const GROUP_COLORS = ["#3b82f6","#8b5cf6","#f97316","#ec4899","#22c55e","#06b6d4","#f59e0b","#ef4444","#64748b"];
 const CHANNEL_COLORS = {
   "@MBCNEWS11":"#3b82f6","@Jtvnews2021":"#8b5cf6","@g1tvnews":"#f97316",
@@ -7,12 +6,12 @@ const CHANNEL_COLORS = {
   "@dailyminjoo":"#06b6d4","@KTV_korea":"#f59e0b",
 };
 const INIT_CHANNELS = [
-  { id:1, handle:"@MBCNEWS11", checked:true, group:"뉴스" },
-  { id:2, handle:"@Jtvnews2021", checked:true, group:"뉴스" },
-  { id:3, handle:"@g1tvnews", checked:true, group:"뉴스" },
-  { id:4, handle:"@KTV이매진", checked:true, group:"방송" },
-  { id:5, handle:"@NATV_korea", checked:true, group:"방송" },
-  { id:6, handle:"@KTV_korea", checked:true, group:"방송" },
+  { id:1, handle:"@MBCNEWS11", checked:true, group:"정치" },
+  { id:2, handle:"@Jtvnews2021", checked:true, group:"정치" },
+  { id:3, handle:"@g1tvnews", checked:true, group:"정치" },
+  { id:4, handle:"@KTV이매진", checked:true, group:"정치" },
+  { id:5, handle:"@NATV_korea", checked:true, group:"정치" },
+  { id:6, handle:"@KTV_korea", checked:true, group:"정치" },
   { id:7, handle:"@이재명tv", checked:true, group:"정치" },
   { id:8, handle:"@dailyminjoo", checked:true, group:"정치" },
 ];
@@ -40,10 +39,7 @@ const fmtDate = (s) => {
   if (d<2) return "1일 전"; if (d<30) return `${d}일 전`;
   if (d<365) return `${Math.floor(d/30)}개월 전`; return `${Math.floor(d/365)}년 전`;
 };
-const publishedAfterISO = (tr) => {
-  const map={"5분":5,"10분":10,"30분":30,"1시간":60,"3시간":180,"6시간":360,"12시간":720,"24시간":1440};
-  return new Date(Date.now()-(map[tr]||60)*60000).toISOString();
-};
+const SCAN_INTERVAL_MS = {"1분":60000,"5분":300000,"10분":600000,"30분":1800000,"1시간":3600000,"3시간":10800000,"6시간":21600000};
 const ytGet = async (url) => {
   const r = await fetch(url);
   const d = await r.json();
@@ -53,15 +49,14 @@ const ytGet = async (url) => {
 const getChannelId = (handle, key) =>
   ytGet(`https://www.googleapis.com/youtube/v3/channels?part=id&forHandle=${encodeURIComponent(handle)}&key=${key}`)
     .then(d => d.items?.[0]?.id || null);
-const searchVideos = (channelId, key, publishedAfter, keywords) => {
-  const p = new URLSearchParams({ part:"snippet", channelId, type:"video", order:"date", maxResults:"50", key, publishedAfter });
+const searchVideos = (channelId, key, keywords) => {
+  const p = new URLSearchParams({ part:"snippet", channelId, type:"video", order:"date", maxResults:"50", key });
   if (keywords) p.set("q", keywords);
   return ytGet(`https://www.googleapis.com/youtube/v3/search?${p}`).then(d => d.items||[]);
 };
 const getVideoDetails = (ids, key) =>
   ytGet(`https://www.googleapis.com/youtube/v3/videos?part=snippet,statistics,contentDetails&id=${ids.join(",")}&key=${key}`)
     .then(d => d.items||[]);
-
 export default function App() {
   const [channels, setChannels] = useState(INIT_CHANNELS);
   const [collapsedGroups, setCollapsedGroups] = useState({});
@@ -85,7 +80,7 @@ export default function App() {
   const cancelRef = useRef(false);
   const logsRef = useRef([]);
   const fileInputRef = useRef(null);
-
+  const startScanRef = useRef(null);
   useEffect(() => {
     if (logRef.current) logRef.current.scrollTop = logRef.current.scrollHeight;
   }, [logs]);
@@ -94,16 +89,22 @@ export default function App() {
     window.addEventListener("keydown", fn);
     return () => window.removeEventListener("keydown", fn);
   }, []);
-
+  useEffect(() => { startScanRef.current = startScan; });
+  useEffect(() => {
+    if (!tracking) return;
+    const ms = SCAN_INTERVAL_MS[timeRange] || 3600000;
+    const timer = setInterval(() => {
+      if (startScanRef.current) startScanRef.current();
+    }, ms);
+    return () => clearInterval(timer);
+  }, [tracking, timeRange]);
   const groups = [...new Set(channels.map(c => c.group||"기본"))];
   const groupColor = (g) => GROUP_COLORS[groups.indexOf(g) % GROUP_COLORS.length];
-
   const ts = () => {
     const n = new Date();
     return `[${String(n.getHours()).padStart(2,"0")}:${String(n.getMinutes()).padStart(2,"0")}:${String(n.getSeconds()).padStart(2,"0")}]`;
   };
   const log = (msg) => { logsRef.current=[...logsRef.current,msg]; setLogs([...logsRef.current]); };
-
   const handleFileImport = (e) => {
     const file = e.target.files[0];
     if (!file) return;
@@ -130,7 +131,6 @@ export default function App() {
     reader.readAsText(file, 'utf-8');
     e.target.value = '';
   };
-
   const addChannel = () => {
     if (!newCh.trim()) return;
     const handle = newCh.trim().startsWith('@') ? newCh.trim() : '@'+newCh.trim();
@@ -139,17 +139,14 @@ export default function App() {
     setNewCh("");
     setShowAdd(false);
   };
-
   const toggleGroupCheck = (group) => {
     const groupChs = channels.filter(c=>(c.group||"기본")===group);
     const allChecked = groupChs.every(c=>c.checked);
     setChannels(channels.map(c=>(c.group||"기본")===group ? {...c,checked:!allChecked} : c));
   };
-
   const deleteGroup = (group) => {
     setChannels(prev => prev.filter(c=>(c.group||"기본")!==group));
   };
-
   const startScan = async () => {
     if (scanning) return;
     if (!apiKey.trim()) { log(`${ts()} ❌ API 키를 먼저 입력해주세요`); return; }
@@ -158,7 +155,6 @@ export default function App() {
     setScanning(true); setLogs([]); setResults(0); setVideos([]);
     const chs = channels.filter(c=>c.checked);
     const allVideos = [];
-    const pa = publishedAfterISO(timeRange);
     const minV = parseInt(minViews||0);
     try {
       for (const ch of chs) {
@@ -170,9 +166,9 @@ export default function App() {
         if (!cid) { log(`${ts()} ⚠️ ${ch.handle} – 채널을 찾을 수 없음`); continue; }
         if (cancelRef.current) break;
         let items;
-        try { items = await searchVideos(cid, apiKey, pa, keywords); }
+        try { items = await searchVideos(cid, apiKey, keywords); }
         catch(e) { log(`${ts()} ❌ ${ch.handle} – ${e.message}`); continue; }
-        if (!items.length) { log(`${ts()} ℹ️ ${ch.handle} – 해당 기간 영상 없음`); continue; }
+        if (!items.length) { log(`${ts()} ℹ️ ${ch.handle} – 영상 없음`); continue; }
         if (cancelRef.current) break;
         const ids = items.map(v=>v.id?.videoId).filter(Boolean);
         let details;
@@ -206,7 +202,6 @@ export default function App() {
       log(cancelRef.current
         ? `${ts()} ⛔ 스캔 중지됨`
         : `${ts()} 🏁 전체 스캔 완료 – 총 ${allVideos.length}개 영상`);
-      if (!cancelRef.current) log(`${ts()} ✅ 스캔 완료 – 총 ${allVideos.length}개 영상 발견`);
     } catch(e) {
       log(`${ts()} ❌ 오류: ${e.message}`);
     } finally {
@@ -221,7 +216,6 @@ export default function App() {
     return 0;
   });
   const I = { background:"#0f0f1a", border:"1px solid #2d2d4a", borderRadius:"8px", padding:"8px 12px", color:"#e2e8f0", fontSize:"13px", outline:"none" };
-
   return (
     <div style={{ fontFamily:"'Malgun Gothic','Apple SD Gothic Neo',sans-serif", background:"#1a1a2e", minHeight:"100vh", color:"#e2e8f0" }}>
       <style>{`*{box-sizing:border-box} ::-webkit-scrollbar{width:5px} ::-webkit-scrollbar-track{background:#0f0f1a} ::-webkit-scrollbar-thumb{background:#2d2d4a;border-radius:3px} select option{background:#1a1a2e} @keyframes spin{to{transform:rotate(360deg)}} .thumb-wrap:hover .play-overlay{opacity:1!important} .video-row:hover{background:#161628!important} .ch-del{opacity:0} .ch-item:hover .ch-del{opacity:1}`}</style>
@@ -237,7 +231,6 @@ export default function App() {
         <span style={{ fontSize:"11px", color:"#4a5568" }}>macOS · Windows</span>
       </div>
       <div style={{ padding:"16px 20px", maxWidth:"980px", margin:"0 auto" }}>
-
         {/* API Key */}
         <div style={{ background:"#16213e", border:`1px solid ${apiKey?"#22c55e44":"#ef444455"}`, borderRadius:"10px", padding:"14px 16px", marginBottom:"12px" }}>
           <div style={{ display:"flex", alignItems:"center", gap:"10px" }}>
@@ -255,11 +248,10 @@ export default function App() {
           </div>
           {!apiKey&&(
             <div style={{ marginTop:"8px", fontSize:"11px", color:"#f59e0b", paddingLeft:"118px" }}>
-              💡 <a href="https://console.cloud.google.com/" target="_blank" rel="noreferrer" style={{ color:"#60a5fa" }}>Google Cloud Console</a> → YouTube Data API v3 활성화 → 사용자 인증 정보 → API 키 생성 (무료 10,000 유닛/일 ≈ 약 12회 전체 스캔)
+              💡 <a href="https://console.cloud.google.com/" target="_blank" rel="noreferrer" style={{ color:"#60a5fa" }}>Google Cloud Console</a> → YouTube Data API v3 활성화 → 사용자 인증 정보 → API 키 생성
             </div>
           )}
         </div>
-
         {/* Channels with Groups */}
         <div style={{ background:"#16213e", border:"1px solid #252545", borderRadius:"10px", padding:"16px", marginBottom:"12px" }}>
           <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:"12px" }}>
@@ -271,13 +263,9 @@ export default function App() {
               <button onClick={()=>{const a=channels.every(c=>c.checked);setChannels(channels.map(c=>({...c,checked:!a})));}} style={{ background:"#22c55e", border:"none", borderRadius:"7px", padding:"7px 13px", color:"#fff", fontSize:"12px", cursor:"pointer", fontWeight:"700" }}>✓ 전체</button>
             </div>
           </div>
-
-          {/* File format hint */}
           <div style={{ fontSize:"11px", color:"#475569", marginBottom:"10px", padding:"8px 10px", background:"#0f0f1a", borderRadius:"6px", border:"1px solid #1e2d40" }}>
             📄 .txt 파일 형식: <span style={{ color:"#60a5fa" }}>[그룹명]</span> 으로 그룹 구분, 한 줄에 @채널명 하나씩 입력 &nbsp;|&nbsp; 예: <code style={{ color:"#94a3b8" }}>[뉴스]</code> → <code style={{ color:"#94a3b8" }}>@MBCNEWS11</code>
           </div>
-
-          {/* Add channel form */}
           {showAdd&&(
             <div style={{ display:"flex", gap:"8px", marginBottom:"12px", padding:"12px", background:"#0f0f1a", borderRadius:"8px", border:"1px solid #2d2d4a" }}>
               <input value={newCh} onChange={e=>setNewCh(e.target.value)} onKeyDown={e=>e.key==="Enter"&&addChannel()}
@@ -289,8 +277,6 @@ export default function App() {
               <button onClick={()=>setShowAdd(false)} style={{ background:"#374151", border:"none", borderRadius:"7px", padding:"8px 12px", color:"#94a3b8", cursor:"pointer" }}>취소</button>
             </div>
           )}
-
-          {/* Groups */}
           <div style={{ display:"flex", flexDirection:"column", gap:"8px" }}>
             {groups.map((group) => {
               const groupChs = channels.filter(c=>(c.group||"기본")===group);
@@ -300,7 +286,6 @@ export default function App() {
               const gc = groupColor(group);
               return (
                 <div key={group} style={{ border:`1px solid ${gc}33`, borderRadius:"9px", overflow:"hidden" }}>
-                  {/* Group header */}
                   <div style={{ display:"flex", alignItems:"center", gap:"8px", padding:"9px 12px", background:gc+"14", cursor:"pointer" }}
                     onClick={()=>setCollapsedGroups(prev=>({...prev,[group]:!prev[group]}))}>
                     <span style={{ fontSize:"11px", color:"#64748b", width:"10px", textAlign:"center" }}>{collapsed?"▶":"▼"}</span>
@@ -314,7 +299,6 @@ export default function App() {
                     <button onClick={e=>{e.stopPropagation();deleteGroup(group);}}
                       style={{ background:"transparent", border:"1px solid #374151", borderRadius:"5px", padding:"2px 8px", color:"#ef4444", fontSize:"11px", cursor:"pointer" }}>그룹 삭제</button>
                   </div>
-                  {/* Channels */}
                   {!collapsed&&(
                     <div style={{ display:"grid", gridTemplateColumns:"repeat(3,1fr)", gap:"6px", padding:"10px" }}>
                       {groupChs.map(ch=>(
@@ -332,8 +316,6 @@ export default function App() {
               );
             })}
           </div>
-
-          {/* Bottom actions */}
           <div style={{ display:"flex", gap:"8px", marginTop:"10px" }}>
             <button onClick={()=>{setShowAdd(v=>!v);setNewChGroup(groups[0]||"기본");}}
               style={{ background:"#1e293b", border:"1px solid #374151", borderRadius:"7px", padding:"7px 14px", color:"#94a3b8", fontSize:"12px", cursor:"pointer" }}>+ 채널 추가</button>
@@ -341,14 +323,13 @@ export default function App() {
               style={{ background:"#1e293b", border:"1px solid #374151", borderRadius:"7px", padding:"7px 14px", color:"#94a3b8", fontSize:"12px", cursor:"pointer" }}>+ 새 그룹 만들기</button>
           </div>
         </div>
-
         {/* Options */}
         <div style={{ background:"#16213e", border:"1px solid #252545", borderRadius:"10px", padding:"16px", marginBottom:"12px" }}>
           {[
             {l:"🎬 영상 타입",c:(<div style={{ display:"flex", background:"#0f0f1a", borderRadius:"8px", overflow:"hidden", border:"1px solid #2d2d4a" }}>{["롱폼","쇼츠"].map(t=><button key={t} onClick={()=>setVideoType(t)} style={{ padding:"8px 26px", border:"none", background:videoType===t?"#22c55e":"transparent", color:videoType===t?"#fff":"#94a3b8", fontSize:"13px", cursor:"pointer", fontWeight:videoType===t?"700":"400" }}>{t}</button>)}</div>)},
             {l:"👁 최소 조회수",c:(<div style={{ display:"flex", alignItems:"center", gap:"10px" }}><input value={minViews} onChange={e=>setMinViews(e.target.value.replace(/\D/g,""))} style={{ ...I, width:"160px" }} placeholder="숫자만 입력" /><span style={{ fontSize:"12px", color:"#475569" }}>숫자만 입력</span></div>)},
             {l:"🔍 추적 기능",c:(<button onClick={()=>setTracking(!tracking)} style={{ background:tracking?"#22c55e":"#374151", border:"none", borderRadius:"8px", padding:"8px 20px", color:"#fff", fontSize:"13px", cursor:"pointer", fontWeight:"700" }}>{tracking?"✓ 활성화":"비활성화"}</button>)},
-            {l:"⏰ 시간 범위",c:(<div style={{ position:"relative" }}><select value={timeRange} onChange={e=>setTimeRange(e.target.value)} style={{ ...I, paddingRight:"28px", appearance:"none", cursor:"pointer" }}>{["5분","10분","30분","1시간","3시간","6시간","12시간","24시간"].map(t=><option key={t}>{t}</option>)}</select><span style={{ position:"absolute", right:"8px", top:"50%", transform:"translateY(-50%)", pointerEvents:"none", color:"#94a3b8", fontSize:"10px" }}>▾</span></div>)},
+            {l:"⏰ 재스캔 간격",c:(<div style={{ display:"flex", alignItems:"center", gap:"10px" }}><div style={{ position:"relative" }}><select value={timeRange} onChange={e=>setTimeRange(e.target.value)} style={{ ...I, paddingRight:"28px", appearance:"none", cursor:"pointer" }}>{["1분","5분","10분","30분","1시간","3시간","6시간"].map(t=><option key={t}>{t}</option>)}</select><span style={{ position:"absolute", right:"8px", top:"50%", transform:"translateY(-50%)", pointerEvents:"none", color:"#94a3b8", fontSize:"10px" }}>▾</span></div><span style={{ fontSize:"11px", color: tracking?"#22c55e":"#475569" }}>{tracking?`✓ 추적 활성 – ${timeRange}마다 자동 재스캔`:"추적 비활성 시 적용 안 됨"}</span></div>)},
             {l:"🔎 검색 키워드",c:(<div style={{ display:"flex", alignItems:"center", gap:"10px" }}><input value={keywords} onChange={e=>setKeywords(e.target.value)} placeholder="제목 키워드 (선택)" style={{ ...I, width:"340px" }} /><span style={{ fontSize:"11px", color:"#475569" }}>쉼표로 구분 (예: 속보,뉴스)</span></div>)},
           ].map(({l,c})=>(
             <div key={l} style={{ display:"flex", alignItems:"center", gap:"14px", marginBottom:"13px" }}>
@@ -356,7 +337,6 @@ export default function App() {
             </div>
           ))}
         </div>
-
         {/* Scan bar */}
         <div style={{ background:"#16213e", border:"1px solid #252545", borderRadius:"10px", padding:"13px 16px", marginBottom:"12px", display:"flex", alignItems:"center", gap:"10px" }}>
           <button onClick={startScan} disabled={scanning} style={{ background:scanning?"#166534":"#22c55e", border:"none", borderRadius:"8px", padding:"10px 24px", color:"#fff", fontSize:"14px", cursor:scanning?"not-allowed":"pointer", fontWeight:"700", display:"flex", alignItems:"center", gap:"7px", opacity:scanning?0.8:1 }}>
@@ -367,7 +347,6 @@ export default function App() {
           <span style={{ fontSize:"14px", color:"#22c55e", fontWeight:"700" }}>결과: {results.toLocaleString()}개</span>
           <button onClick={()=>{setResults(0);setVideos([]);setLogs([]);logsRef.current=[];}} style={{ background:"#2d2d4a", border:"none", borderRadius:"7px", padding:"8px 13px", color:"#94a3b8", fontSize:"12px", cursor:"pointer" }}>🗑 초기화</button>
         </div>
-
         {/* Video list */}
         <div style={{ background:"#16213e", border:"1px solid #252545", borderRadius:"10px", padding:"16px", marginBottom:"12px" }}>
           <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:"12px" }}>
@@ -402,7 +381,6 @@ export default function App() {
             ))}
           </div>
         </div>
-
         {/* Logs */}
         <div style={{ background:"#0a0a18", border:"1px solid #252545", borderRadius:"10px", padding:"12px 16px" }}>
           <div style={{ display:"flex", alignItems:"center", marginBottom:"8px" }}>
@@ -415,7 +393,6 @@ export default function App() {
           </div>
         </div>
       </div>
-
       {/* Video modal */}
       {selectedVideo&&(
         <div onClick={()=>setSelectedVideo(null)} style={{ position:"fixed", inset:0, background:"rgba(0,0,0,0.88)", zIndex:1000, display:"flex", alignItems:"center", justifyContent:"center", padding:"20px" }}>
