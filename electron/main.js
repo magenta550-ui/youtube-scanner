@@ -19,6 +19,7 @@ function createWindow() {
     autoHideMenuBar: true,
   })
 
+  // 외부 링크는 기본 브라우저에서 열기
   win.webContents.setWindowOpenHandler(({ url }) => {
     shell.openExternal(url)
     return { action: 'deny' }
@@ -30,6 +31,7 @@ function createWindow() {
     win.loadFile(path.join(__dirname, '../dist/index.html'))
   }
 }
+
 app.userAgentFallback = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
 
 app.whenReady().then(createWindow)

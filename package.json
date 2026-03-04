@@ -6,22 +6,34 @@
   "scripts": {
     "dev": "concurrently \"vite\" \"wait-on http://localhost:5173 && electron .\"",
     "build": "vite build && electron-builder --win",
+    "build:linux": "vite build && electron-builder --linux",
     "preview": "vite preview"
   },
   "build": {
     "appId": "com.ytscanner.app",
     "productName": "YouTube Channel Scanner",
-    "directories": { "output": "dist-electron" },
-    "files": ["dist/**/*", "electron/**/*"],
+    "directories": {
+      "output": "dist-electron"
+    },
+    "files": [
+      "dist/**/*",
+      "electron/**/*"
+    ],
     "win": {
-      "target": [{ "target": "nsis", "arch": ["x64"] }],
+      "target": [
+        {
+          "target": "nsis",
+          "arch": ["x64"]
+        }
+      ],
       "icon": "public/icon.ico"
     },
     "nsis": {
       "oneClick": false,
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
-      "createStartMenuShortcut": true
+      "createStartMenuShortcut": true,
+      "installerHeaderIcon": "public/icon.ico"
     }
   },
   "dependencies": {
